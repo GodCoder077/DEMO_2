@@ -1,0 +1,832 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ESP32 Access Control System</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&display=swap');
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Orbitron', monospace;
+            background: linear-gradient(45deg, #0a0a23, #1a1a2e, #16213e, #0f3460);
+            background-size: 400% 400%;
+            animation: gradientShift 10s ease infinite;
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+            position: relative;
+            overflow-x: hidden;
+        }
+
+        body::before {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: 
+                radial-gradient(circle at 20% 80%, rgba(120, 119, 198, 0.3) 0%, transparent 50%),
+                radial-gradient(circle at 80% 20%, rgba(255, 119, 198, 0.15) 0%, transparent 50%),
+                radial-gradient(circle at 40% 40%, rgba(120, 219, 255, 0.1) 0%, transparent 50%);
+            pointer-events: none;
+            z-index: -1;
+        }
+
+        @keyframes gradientShift {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+
+        .container {
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(20px);
+            border-radius: 25px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            box-shadow: 
+                0 25px 50px rgba(0, 0, 0, 0.3),
+                inset 0 1px 0 rgba(255, 255, 255, 0.1);
+            padding: 40px;
+            max-width: 900px;
+            width: 65%;
+            min-width: 600px;
+            height: 85vh;
+            min-height: 700px;
+            overflow-y: auto;
+            position: relative;
+        }
+
+        .container::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            border-radius: 25px;
+            padding: 2px;
+            background: linear-gradient(45deg, #00f5ff, #ff00f5, #f5ff00, #00f5ff);
+            background-size: 300% 300%;
+            animation: borderGlow 3s ease infinite;
+            mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+            mask-composite: exclude;
+            pointer-events: none;
+            opacity: 0.6;
+        }
+
+        @keyframes borderGlow {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+
+        /* Mobile responsiveness */
+        @media (max-width: 1024px) {
+            .container {
+                width: 80%;
+                height: 75vh;
+                min-width: 500px;
+                padding: 30px;
+            }
+        }
+
+        @media (max-width: 768px) {
+            body {
+                padding: 10px;
+            }
+            
+            .container {
+                width: 95%;
+                height: 80vh;
+                min-width: 350px;
+                padding: 20px;
+                margin: 5px;
+                border-radius: 20px;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .container {
+                width: 98%;
+                height: 85vh;
+                min-width: 300px;
+                padding: 15px;
+                margin: 3px;
+                border-radius: 15px;
+            }
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+            position: relative;
+        }
+
+        .header h1 {
+            color: #fff;
+            font-size: clamp(24px, 3vw, 36px);
+            font-weight: 900;
+            margin-bottom: 15px;
+            text-shadow: 
+                0 0 10px rgba(0, 245, 255, 0.8),
+                0 0 20px rgba(0, 245, 255, 0.5),
+                0 0 30px rgba(0, 245, 255, 0.3);
+            animation: titlePulse 2s ease-in-out infinite alternate;
+        }
+
+        @keyframes titlePulse {
+            from { text-shadow: 0 0 10px rgba(0, 245, 255, 0.8), 0 0 20px rgba(0, 245, 255, 0.5), 0 0 30px rgba(0, 245, 255, 0.3); }
+            to { text-shadow: 0 0 15px rgba(0, 245, 255, 1), 0 0 25px rgba(0, 245, 255, 0.7), 0 0 35px rgba(0, 245, 255, 0.5); }
+        }
+
+        .status-indicator {
+            display: inline-block;
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            background: radial-gradient(circle, #00ff00, #00cc00);
+            margin-left: 10px;
+            box-shadow: 0 0 15px #00ff00;
+            animation: statusPulse 1.5s ease infinite;
+        }
+
+        @keyframes statusPulse {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.7; transform: scale(1.2); }
+        }
+
+        .display {
+            background: linear-gradient(135deg, #000 0%, #1a1a1a 100%);
+            color: #00ff41;
+            padding: 25px;
+            border-radius: 15px;
+            margin-bottom: 25px;
+            font-family: 'Orbitron', monospace;
+            font-size: clamp(20px, 2.5vw, 28px);
+            font-weight: 700;
+            text-align: center;
+            min-height: 80px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border: 2px solid #00ff41;
+            box-shadow: 
+                0 0 20px rgba(0, 255, 65, 0.3),
+                inset 0 0 20px rgba(0, 255, 65, 0.1);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .display::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(0, 255, 65, 0.2), transparent);
+            animation: scanline 3s linear infinite;
+        }
+
+        @keyframes scanline {
+            0% { left: -100%; }
+            100% { left: 100%; }
+        }
+
+        .input-display {
+            background: rgba(26, 26, 26, 0.8);
+            color: #00f5ff;
+            padding: 20px;
+            border-radius: 12px;
+            margin-bottom: 25px;
+            font-family: 'Orbitron', monospace;
+            font-size: clamp(16px, 2vw, 20px);
+            text-align: center;
+            border: 1px solid #00f5ff;
+            box-shadow: 0 0 15px rgba(0, 245, 255, 0.3);
+            backdrop-filter: blur(10px);
+        }
+
+        .keypad {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 15px;
+            margin-bottom: 25px;
+        }
+
+        .key {
+            background: linear-gradient(145deg, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0.05));
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 15px;
+            padding: 20px;
+            font-size: clamp(20px, 2.5vw, 28px);
+            font-weight: bold;
+            color: #fff;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2);
+            min-height: 80px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-family: 'Orbitron', monospace;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .key::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: linear-gradient(45deg, transparent, rgba(255, 255, 255, 0.1), transparent);
+            transform: translateX(-100%);
+            transition: transform 0.6s;
+        }
+
+        .key:hover::before {
+            transform: translateX(100%);
+        }
+
+        .key:hover {
+            background: linear-gradient(145deg, rgba(255, 255, 255, 0.2), rgba(255, 255, 255, 0.1));
+            transform: translateY(-3px);
+            box-shadow: 
+                0 12px 24px rgba(0, 0, 0, 0.3),
+                0 0 20px rgba(0, 245, 255, 0.5);
+            border-color: rgba(0, 245, 255, 0.8);
+        }
+
+        .key:active {
+            transform: translateY(-1px);
+            box-shadow: 0 6px 12px rgba(0, 0, 0, 0.2);
+        }
+
+        .special-key {
+            background: linear-gradient(145deg, #ff6b6b, #ee5a52);
+            color: white;
+            text-shadow: 0 0 10px rgba(255, 255, 255, 0.8);
+        }
+
+        .special-key:hover {
+            background: linear-gradient(145deg, #ff5252, #e53935);
+            box-shadow: 
+                0 12px 24px rgba(0, 0, 0, 0.3),
+                0 0 20px rgba(255, 107, 107, 0.6);
+        }
+
+        .leds {
+            display: flex;
+            justify-content: center;
+            gap: 50px;
+            margin-bottom: 25px;
+        }
+
+        .led {
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            border: 3px solid rgba(255, 255, 255, 0.3);
+            transition: all 0.5s ease;
+            position: relative;
+        }
+
+        .led::before {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 30%;
+            height: 30%;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.9);
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+
+        .led.green {
+            background: radial-gradient(circle, #00ff00, #00cc00);
+            box-shadow: 
+                0 0 30px #00ff00,
+                0 0 60px #00ff00,
+                inset 0 0 10px rgba(255, 255, 255, 0.2);
+            border-color: #00ff00;
+            animation: ledPulse 1s ease infinite;
+        }
+
+        .led.green::before {
+            opacity: 1;
+        }
+
+        .led.red {
+            background: radial-gradient(circle, #ff0040, #cc0033);
+            box-shadow: 
+                0 0 30px #ff0040,
+                0 0 60px #ff0040,
+                inset 0 0 10px rgba(255, 255, 255, 0.2);
+            border-color: #ff0040;
+            animation: ledPulse 1s ease infinite;
+        }
+
+        .led.red::before {
+            opacity: 1;
+        }
+
+        .led.off {
+            background: radial-gradient(circle, #333, #111);
+            box-shadow: inset 0 0 10px rgba(0, 0, 0, 0.8);
+        }
+
+        @keyframes ledPulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.7; }
+        }
+
+        .servo-indicator {
+            text-align: center;
+            margin-bottom: 25px;
+            padding: 20px;
+            background: rgba(33, 150, 243, 0.1);
+            border-radius: 12px;
+            border: 1px solid rgba(33, 150, 243, 0.3);
+            font-size: clamp(16px, 2vw, 22px);
+            color: #2196F3;
+            font-weight: 700;
+            backdrop-filter: blur(10px);
+            box-shadow: 0 0 15px rgba(33, 150, 243, 0.2);
+        }
+
+        .servo-indicator.unlocked {
+            background: rgba(76, 175, 80, 0.1);
+            border-color: rgba(76, 175, 80, 0.5);
+            color: #4CAF50;
+            box-shadow: 0 0 20px rgba(76, 175, 80, 0.4);
+            animation: unlockGlow 2s ease infinite;
+        }
+
+        @keyframes unlockGlow {
+            0%, 100% { box-shadow: 0 0 20px rgba(76, 175, 80, 0.4); }
+            50% { box-shadow: 0 0 30px rgba(76, 175, 80, 0.6); }
+        }
+
+        .log-section {
+            margin-top: 25px;
+            padding: 20px;
+            background: rgba(249, 249, 249, 0.05);
+            border-radius: 12px;
+            max-height: 200px;
+            overflow-y: auto;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .log-section h3 {
+            font-size: clamp(16px, 2vw, 20px);
+            margin-bottom: 15px;
+            color: #00f5ff;
+            text-shadow: 0 0 10px rgba(0, 245, 255, 0.5);
+        }
+
+        .log-entry {
+            padding: 12px;
+            margin: 8px 0;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 8px;
+            border-left: 4px solid #2196F3;
+            font-size: clamp(12px, 1.5vw, 16px);
+            font-family: 'Orbitron', monospace;
+            color: #fff;
+            backdrop-filter: blur(5px);
+            transition: all 0.3s ease;
+        }
+
+        .log-entry:hover {
+            background: rgba(255, 255, 255, 0.1);
+            transform: translateX(5px);
+        }
+
+        .log-entry.granted {
+            border-left-color: #4CAF50;
+            box-shadow: 0 0 10px rgba(76, 175, 80, 0.2);
+        }
+
+        .log-entry.denied {
+            border-left-color: #f44336;
+            box-shadow: 0 0 10px rgba(244, 67, 54, 0.2);
+        }
+
+        .time-display {
+            text-align: center;
+            margin-bottom: 20px;
+            font-size: clamp(14px, 1.8vw, 18px);
+            color: #00f5ff;
+            font-family: 'Orbitron', monospace;
+            font-weight: 700;
+            text-shadow: 0 0 10px rgba(0, 245, 255, 0.5);
+        }
+
+        .authorized-users {
+            margin-top: 25px;
+            padding: 20px;
+            background: rgba(227, 242, 253, 0.05);
+            border-radius: 12px;
+            border: 1px solid rgba(33, 150, 243, 0.3);
+            backdrop-filter: blur(10px);
+        }
+
+        .authorized-users h3 {
+            margin-bottom: 15px;
+            color: #2196F3;
+            font-size: clamp(16px, 2vw, 20px);
+            text-shadow: 0 0 10px rgba(33, 150, 243, 0.5);
+        }
+
+        .user-list {
+            font-family: 'Orbitron', monospace;
+            font-size: clamp(12px, 1.5vw, 16px);
+            line-height: 1.8;
+            color: rgba(255, 255, 255, 0.8);
+        }
+
+        /* Custom scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: linear-gradient(45deg, #00f5ff, #ff00f5);
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: linear-gradient(45deg, #00d4ff, #e600d4);
+        }
+
+        /* Floating particles animation */
+        .particles {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: -1;
+        }
+
+        .particle {
+            position: absolute;
+            width: 4px;
+            height: 4px;
+            background: #00f5ff;
+            border-radius: 50%;
+            animation: float 6s linear infinite;
+            opacity: 0.7;
+        }
+
+        @keyframes float {
+            0% {
+                transform: translateY(100vh) rotate(0deg);
+                opacity: 0;
+            }
+            10% {
+                opacity: 0.7;
+            }
+            90% {
+                opacity: 0.7;
+            }
+            100% {
+                transform: translateY(-10px) rotate(360deg);
+                opacity: 0;
+            }
+        }
+
+        /* Mobile adjustments */
+        @media (max-width: 480px) {
+            .display {
+                padding: 15px;
+                margin-bottom: 15px;
+                min-height: 60px;
+                font-size: 18px;
+            }
+            
+            .input-display {
+                padding: 12px;
+                margin-bottom: 15px;
+                font-size: 14px;
+            }
+            
+            .keypad {
+                gap: 8px;
+                margin-bottom: 15px;
+            }
+            
+            .key {
+                padding: 12px;
+                min-height: 55px;
+                font-size: 18px;
+                border-radius: 10px;
+            }
+            
+            .leds {
+                gap: 25px;
+                margin-bottom: 15px;
+            }
+            
+            .led {
+                width: 35px;
+                height: 35px;
+                border: 2px solid rgba(255, 255, 255, 0.3);
+            }
+            
+            .servo-indicator {
+                padding: 15px;
+                margin-bottom: 15px;
+                font-size: 16px;
+            }
+            
+            .time-display {
+                margin-bottom: 15px;
+                font-size: 14px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="particles" id="particles"></div>
+    
+    <div class="container">
+        <div class="header">
+            <h1>ACCESS CONTROL SYSTEM <span class="status-indicator"></span></h1>
+            <div class="time-display" id="timeDisplay"></div>
+        </div>
+
+        <div class="display" id="display">ENTER ID:</div>
+        
+        <div class="input-display" id="inputDisplay">
+            ID: <span id="userIdDisplay"></span> | PASS: <span id="passwordDisplay"></span>
+        </div>
+
+        <div class="leds">
+            <div class="led off" id="greenLed" title="Access Granted"></div>
+            <div class="led off" id="redLed" title="Access Denied"></div>
+        </div>
+
+        <div class="servo-indicator" id="servoStatus">
+            🔒 DOOR: LOCKED
+        </div>
+
+        <div class="keypad">
+            <button class="key" onclick="handleKey('1')">1</button>
+            <button class="key" onclick="handleKey('2')">2</button>
+            <button class="key" onclick="handleKey('3')">3</button>
+            <button class="key" onclick="handleKey('A')">A</button>
+            <button class="key" onclick="handleKey('4')">4</button>
+            <button class="key" onclick="handleKey('5')">5</button>
+            <button class="key" onclick="handleKey('6')">6</button>
+            <button class="key" onclick="handleKey('B')">B</button>
+            <button class="key" onclick="handleKey('7')">7</button>
+            <button class="key" onclick="handleKey('8')">8</button>
+            <button class="key" onclick="handleKey('9')">9</button>
+            <button class="key" onclick="handleKey('C')">C</button>
+            <button class="key special-key" onclick="handleKey('*')">✱ RESET</button>
+            <button class="key" onclick="handleKey('0')">0</button>
+            <button class="key special-key" onclick="handleKey('#')">⬢ ENTER</button>
+            <button class="key" onclick="handleKey('D')">D</button>
+        </div>
+
+        <div class="log-section">
+            <h3>ACCESS LOG</h3>
+            <div id="logContainer"></div>
+        </div>
+    </div>
+
+    <script>
+        // Create floating particles
+        function createParticles() {
+            const particlesContainer = document.getElementById('particles');
+            
+            for (let i = 0; i < 50; i++) {
+                const particle = document.createElement('div');
+                particle.className = 'particle';
+                particle.style.left = Math.random() * 100 + '%';
+                particle.style.animationDelay = Math.random() * 6 + 's';
+                particle.style.animationDuration = (Math.random() * 3 + 3) + 's';
+                particlesContainer.appendChild(particle);
+            }
+        }
+
+        // Authorized users (same as ESP32 code)
+        const authorizedUsers = [
+            {id: "101", password: "1234"},
+            {id: "102", password: "5678"},
+            {id: "103", password: "9999"}
+        ];
+
+        // State machine
+        const State = {
+            ENTER_ID: 'ENTER_ID',
+            ENTER_PASS: 'ENTER_PASS'
+        };
+
+        let currentState = State.ENTER_ID;
+        let userID = "";
+        let inputPassword = "";
+
+        // DOM elements
+        const display = document.getElementById('display');
+        const userIdDisplay = document.getElementById('userIdDisplay');
+        const passwordDisplay = document.getElementById('passwordDisplay');
+        const greenLed = document.getElementById('greenLed');
+        const redLed = document.getElementById('redLed');
+        const servoStatus = document.getElementById('servoStatus');
+        const logContainer = document.getElementById('logContainer');
+        const timeDisplay = document.getElementById('timeDisplay');
+
+        // Initialize
+        function init() {
+            createParticles();
+            updateDisplay();
+            updateTime();
+            setInterval(updateTime, 1000);
+        }
+
+        function updateTime() {
+            const now = new Date();
+            const timeString = now.toLocaleTimeString('en-GB', {timeZone: 'Asia/Kolkata'});
+            timeDisplay.textContent = `IST: ${timeString}`;
+        }
+
+        function handleKey(key) {
+            console.log('Key pressed:', key);
+            
+            // Add click effect
+            const keyElement = event.target;
+            keyElement.style.transform = 'scale(0.95)';
+            setTimeout(() => {
+                keyElement.style.transform = '';
+            }, 150);
+            
+            if (key === '*') {
+                // Reset
+                userID = "";
+                inputPassword = "";
+                currentState = State.ENTER_ID;
+                displayMessage("ENTER ID:");
+                resetLeds();
+            } else if (key === '#') {
+                // Enter
+                if (currentState === State.ENTER_ID) {
+                    if (userID.length > 0) {
+                        currentState = State.ENTER_PASS;
+                        displayMessage("ENTER PASS:");
+                    }
+                } else {
+                    checkAuthorization();
+                    setTimeout(() => {
+                        userID = "";
+                        inputPassword = "";
+                        currentState = State.ENTER_ID;
+                        displayMessage("ENTER ID:");
+                        resetLeds();
+                        resetServo();
+                    }, 3000);
+                }
+            } else {
+                // Regular keys
+                if (currentState === State.ENTER_ID) {
+                    userID += key;
+                } else {
+                    inputPassword += key;
+                }
+            }
+            
+            updateDisplay();
+        }
+
+        function updateDisplay() {
+            userIdDisplay.textContent = userID || '';
+            passwordDisplay.textContent = '●'.repeat(inputPassword.length);
+        }
+
+        function displayMessage(msg) {
+            display.textContent = msg;
+        }
+
+        function checkAuthorization() {
+            let access = false;
+            
+            for (let user of authorizedUsers) {
+                if (user.id === userID && user.password === inputPassword) {
+                    access = true;
+                    break;
+                }
+            }
+
+            if (access) {
+                // Access granted
+                greenLed.classList.remove('off');
+                greenLed.classList.add('green');
+                displayMessage("ACCESS GRANTED");
+                servoStatus.innerHTML = "🔓 DOOR: UNLOCKED";
+                servoStatus.classList.add('unlocked');
+                console.log("Access Granted");
+                logToBlockchain(userID, "GRANTED");
+                
+                // Auto-lock after 3 seconds
+                setTimeout(() => {
+                    resetServo();
+                }, 3000);
+            } else {
+                // Access denied
+                redLed.classList.remove('off');
+                redLed.classList.add('red');
+                displayMessage("ACCESS DENIED");
+                console.log("Access Denied");
+                logToBlockchain(userID, "DENIED");
+            }
+        }
+
+        function resetLeds() {
+            greenLed.classList.remove('green');
+            greenLed.classList.add('off');
+            redLed.classList.remove('red');
+            redLed.classList.add('off');
+        }
+
+        function resetServo() {
+            servoStatus.innerHTML = "🔒 DOOR: LOCKED";
+            servoStatus.classList.remove('unlocked');
+        }
+
+        async function logToBlockchain(user, status) {
+            try {
+                const timestamp = new Date().toLocaleString('en-GB', {timeZone: 'Asia/Kolkata'});
+                const logData = {
+                    user: user,
+                    status: status,
+                    timestamp: timestamp
+                };
+
+                // Log to webhook (same as ESP32 code)
+                const response = await fetch('https://webhook.site/8ff9702e-8d10-42d9-93f6-9507f319619f', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(logData)
+                });
+
+                console.log('HTTP Response code:', response.status);
+                
+                // Add to local log display
+                addLogEntry(user, status, timestamp);
+
+            } catch (error) {
+                console.error('Error logging to blockchain:', error);
+                // Still add to local log even if webhook fails
+                const timestamp = new Date().toLocaleString('en-GB', {timeZone: 'Asia/Kolkata'});
+                addLogEntry(user, status, timestamp);
+            }
+        }
+
+        function addLogEntry(user, status, timestamp) {
+            const logEntry = document.createElement('div');
+            logEntry.className = `log-entry ${status.toLowerCase()}`;
+            logEntry.textContent = `${timestamp} - USER: ${user} - STATUS: ${status}`;
+            
+            logContainer.insertBefore(logEntry, logContainer.firstChild);
+            
+            // Keep only last 10 entries
+            while (logContainer.children.length > 10) {
+                logContainer.removeChild(logContainer.lastChild);
+            }
+        }
+
+        // Initialize the system
+        init();
+
+        // Add keyboard support
+        document.addEventListener('keydown', function(event) {
+            const key = event.key.toUpperCase();
+            if ('0123456789ABCD'.includes(key)) {
+                handleKey(key);
+            } else if (
